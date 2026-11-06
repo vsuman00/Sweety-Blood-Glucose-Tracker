@@ -4,6 +4,24 @@ A private glucose journal built for the Kenpath take-home assignment with React,
 
 ![Sweety dashboard with synthetic readings](docs/screenshots/dashboard.png)
 
+## Assignment coverage
+
+The required application features and local delivery materials are implemented. The following checklist describes the local project; publishing the commits to GitHub and submitting the assignment remain separate approval steps.
+
+| Requirement                           | Local implementation                                                                                                                                               |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| React, Node.js/Express and PostgreSQL | React client, Express API, SQL migration and PostgreSQL session store                                                                                              |
+| Registration, login and private data  | Name/email/password registration, bcrypt hashes and user-scoped queries                                                                                            |
+| Reading CRUD                          | Create, view, edit and delete date, meal slot and glucose value in mg/dl                                                                                           |
+| Reading rules                         | Four named slots, whole numbers from 40 to 600, no future dates, duplicate prevention and at most four per day; edits use the same validation                      |
+| Concurrency and errors                | Database uniqueness, version checks for stale changes and readable errors                                                                                          |
+| Reports                               | Daily, selected-date month-to-date and full previous-calendar-month summaries; highest, lowest, one-decimal average and count; daily reading list and empty states |
+| Data setup                            | Numbered migration, repeatable synthetic seed, two demo accounts and secret-free `.env.example`                                                                    |
+| Documentation and demonstration       | Setup/test instructions, date assumptions, possible improvements and desktop/login/mobile screenshots                                                              |
+| Version history                       | Incremental local commits for features, fixes, tests and documentation                                                                                             |
+
+Verification commands and their coverage are described below. Screenshots satisfy the assignment's screenshots-or-demo option; a separate video is not required.
+
 ## Run locally
 
 Requires Node.js 22.12 or newer, npm, and a running PostgreSQL server (tested locally with PostgreSQL 17). No MongoDB or hosted services are required.
