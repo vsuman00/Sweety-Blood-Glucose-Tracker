@@ -15,6 +15,7 @@ export function createApp({pool, secret, origin = 'http://127.0.0.1:5173', produ
  app.use((req,res,next) => {res.set('X-Content-Type-Options','nosniff'); res.set('Referrer-Policy','same-origin'); next();});
  app.use(express.json({limit:'16kb'}));
  app.use('/api', (req,res,next) => {
+  if (!['GET','HEAD','OPTIONS'].includes(req.method) && (!req.body || typeof req.body !== 'object' || Array.isArray(req.body))) return next(fail(400,'INVALID_JSON','Send a JSON object.'));
   res.set('Cache-Control', 'no-store');
   if (!['GET','HEAD','OPTIONS'].includes(req.method) && req.get('origin') !== origin) return next(fail(403,'ORIGIN_REJECTED','Please use the application to make this change.'));
   next();
