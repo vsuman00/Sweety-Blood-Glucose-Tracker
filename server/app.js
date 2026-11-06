@@ -115,7 +115,11 @@ export function createApp({
         "Please check the highlighted fields.",
         fields,
       );
-    return { name: name?.trim(), email: email.trim().toLowerCase(), password };
+    return {
+      name: register ? name.trim() : undefined,
+      email: email.trim().toLowerCase(),
+      password,
+    };
   }
   app.post("/api/auth/register", authLimiter, async (req, res) => {
     const data = validateAccount(req.body, true);

@@ -306,3 +306,19 @@ test("database constraints reject bypasses", async () => {
     { code: "23514" },
   );
 });
+
+test("malformed request bodies return clear errors and login ignores unrelated fields", async () => {
+  await alice.post("/api/readings").set("Origin", origin).send([]).expect(400);
+  await alice
+    .post("/api/readings")
+    .set("Origin", origin)
+    .set("Content-Type", "application/json")
+    .send("{bad")
+    .expect(400);
+  await alice.post("/api/readings").set("Origin", origin).expect(400);
+  await mutate(request(app), "post", "/api/auth/login", {
+    email: "alice@example.test",
+    password: "synthetic-password",
+    name: 123,
+  }).expect(200);
+});
