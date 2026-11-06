@@ -12,9 +12,10 @@
     "db:migrate": "node --env-file=.env scripts/migrate.js",
     "db:seed": "node --env-file=.env scripts/seed.js",
     "test": "node --env-file=.env --test --test-concurrency=1 tests/*.test.js",
-    "test:browser": "node --env-file=.env tests/browser.js",
+    "test:browser": "node --env-file=.env tests/browser.js && npm run test:session",
     "format": "prettier --write client server scripts tests vite.config.js package.json index.html README.md",
-    "format:check": "prettier --check client server scripts tests vite.config.js package.json index.html README.md"
+    "format:check": "prettier --check client server scripts tests vite.config.js package.json index.html README.md",
+    "test:session": "node tests/session-browser.js"
   },
   "engines": {
     "node": ">=22.12"

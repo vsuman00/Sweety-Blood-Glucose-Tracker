@@ -51,6 +51,23 @@ function App() {
     [formError, setFormError] = useState(null),
     [notice, setNotice] = useState("");
   const [deleting, setDeleting] = useState(null);
+  function clearSessionState(error = null) {
+    setUser(null);
+    setReports(null);
+    setEditing(null);
+    setDeleting(null);
+    setForm({ date: maxDate, slot: "morning_fasting", value: "" });
+    setFormError(null);
+    setLoadError(null);
+    setNotice("");
+    setLoading(false);
+    setAuth({ name: "", email: "", password: "" });
+    setRegister(false);
+    setAuthError(error);
+  }
+  function sessionExpired() {
+    clearSessionState(new Error("Your session expired. Please log in again."));
+  }
   useEffect(() => {
     api("/auth/me")
       .then((data) => {
@@ -77,7 +94,7 @@ function App() {
       .catch((error) => {
         if (active) {
           setLoadError(error);
-          if (error.status === 401) setUser(null);
+          if (error.status === 401) sessionExpired();
         }
       })
       .finally(() => {
@@ -107,11 +124,10 @@ function App() {
     setAuthError(null);
     try {
       if (register) await api("/auth/register", send("POST", auth));
-      const data = await api("/auth/login", send("POST", auth));
-      setUser(data.user);
-      setRegister(false);
-      setAuth({ ...auth, password: "" });
+      await api("/auth/login", send("POST", auth));
       const me = await api("/auth/me");
+      clearSessionState();
+      setUser(me.user);
       setMaxDate(me.today);
       setDate(me.today);
       setForm({ date: me.today, slot: "morning_fasting", value: "" });
@@ -143,7 +159,7 @@ function App() {
       setRefresh((n) => n + 1);
     } catch (error) {
       setFormError(error);
-      if (error.status === 401) setUser(null);
+      if (error.status === 401) sessionExpired();
     } finally {
       setBusy(false);
     }
@@ -164,7 +180,7 @@ function App() {
     } catch (error) {
       setFormError(error);
       setDeleting(null);
-      if (error.status === 401) setUser(null);
+      if (error.status === 401) sessionExpired();
     } finally {
       setBusy(false);
     }
@@ -195,15 +211,16 @@ function App() {
         {user && (
           <button
             className="quiet"
+            disabled={busy}
             onClick={async () => {
+              setBusy(true);
               try {
                 await api("/auth/logout", send("POST", {}));
-                setUser(null);
-                setReports(null);
-                resetForm();
-                setNotice("");
+                clearSessionState();
               } catch (error) {
                 setLoadError(error);
+              } finally {
+                setBusy(false);
               }
             }}
           >
@@ -511,11 +528,7 @@ function App() {
               </p>
               <p className="muted">This cannot be undone.</p>
               <div className="row-actions">
-                <button
-                  autoFocus
-                  disabled={busy}
-                  onClick={() => setDeleting(null)}
-                >
+                <button disabled={busy} onClick={() => setDeleting(null)}>
                   Keep reading
                 </button>
                 <button

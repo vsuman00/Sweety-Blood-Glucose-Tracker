@@ -29,7 +29,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173**. The API runs on port 3001. Use this exact browser origin; state-changing API requests require an Origin header matching `APP_ORIGIN`. Vite proxies `/api` to Express. Stop the app with Ctrl+C.
+Open **http://127.0.0.1:5173**. The API runs on port 3001. Use this exact browser origin; state-changing API requests require an Origin header matching `APP_ORIGIN`. Vite proxies `/api` to Express and fails clearly if port 5173 is occupied, keeping the browser origin consistent. Stop the app with Ctrl+C.
 
 Synthetic demo accounts:
 
@@ -59,11 +59,11 @@ npm run test:browser
 npm run format:check
 ```
 
-API tests use real PostgreSQL. **They truncate users, readings and sessions in `TEST_DATABASE_URL`**, which must be a separate database with a name ending in `_test`. Never point it at data you need. Browser tests use that test database, serve the built client on port 3002 and remove their temporary account. Run the two suites sequentially.
+API tests use real PostgreSQL. **They truncate users, readings and sessions in `TEST_DATABASE_URL`**, which must be a separate database with a name ending in `_test`. Never point it at data you need. Browser tests use that test database, serve the built client on port 3002 and remove their temporary account. Run the API and browser suites sequentially. The browser command also runs a separate mocked session-expiry suite on port 3003 without database access.
 
 The browser test uses an installed Google Chrome through Playwright; no running development server is needed. If Chrome is unavailable, install it before running that optional local browser check. The API tests and production build do not require Chrome.
 
-The tests cover authentication, bcrypt storage, normalized email uniqueness, logout, Origin checks, two-user isolation, boundary and invalid values, invalid/future dates, create/edit validation, four-slot limits, duplicate races, stale edit/delete conflicts, empty reports, calendar boundaries and rounding. The browser journey covers registration, an empty day, creation, duplicate errors, editing, deletion, mobile overflow, decimal display and logout. Database constraint tests also bypass the API to check enforcement.
+The tests cover authentication, bcrypt storage, normalized email uniqueness, logout, Origin checks, two-user isolation, boundary and invalid values, invalid/future dates, create/edit validation, four-slot limits, duplicate races, stale edit/delete conflicts, empty reports, calendar boundaries and rounding. The browser journey covers registration, an empty day, creation, duplicate errors, editing, deletion, mobile overflow, decimal display and logout. Database constraint tests also bypass the API to check enforcement. Additional regressions cover oversized reading versions, clearing old account state after session expiry during save/delete, delayed account switching, and restoring keyboard focus after closing the delete dialog.
 
 ## Design and API
 
