@@ -31,7 +31,7 @@ function App(){
   event.preventDefault();setBusy(true);setAuthError(null);
   try{
    if(register) await api('/auth/register',send('POST',auth));
-   const data=await api('/auth/login',send('POST',auth));setUser(data.user);setAuth({...auth,password:''});
+   const data=await api('/auth/login',send('POST',auth));setUser(data.user);setRegister(false);setAuth({...auth,password:''});
    const me=await api('/auth/me');setMaxDate(me.today);setDate(me.today);setForm({date:me.today,slot:'morning_fasting',value:''});
   }catch(error){setAuthError(error);}finally{setBusy(false);}
  }
