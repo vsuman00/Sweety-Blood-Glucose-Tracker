@@ -381,7 +381,18 @@ function App() {
                     min="1900-01-01"
                     max={maxDate}
                     value={form.date}
-                    onChange={(e) => setForm({ ...form, date: e.target.value })}
+                    onInvalid={(event) => {
+                      const input = event.currentTarget;
+                      input.setCustomValidity(
+                        input.validity.rangeOverflow
+                          ? "Date cannot be in the future."
+                          : "Choose a valid date from 1900 through today.",
+                      );
+                    }}
+                    onChange={(e) => {
+                      e.currentTarget.setCustomValidity("");
+                      setForm({ ...form, date: e.target.value });
+                    }}
                   />
                 </label>
                 <label>
@@ -410,7 +421,18 @@ function App() {
                   inputMode="numeric"
                   placeholder="e.g. 105"
                   value={form.value}
-                  onChange={(e) => setForm({ ...form, value: e.target.value })}
+                  onInvalid={(event) => {
+                    const input = event.currentTarget;
+                    input.setCustomValidity(
+                      input.validity.valueMissing && !input.validity.badInput
+                        ? "Please enter a glucose value."
+                        : "Value must be a whole number between 40 and 600 mg/dl.",
+                    );
+                  }}
+                  onChange={(e) => {
+                    e.currentTarget.setCustomValidity("");
+                    setForm({ ...form, value: e.target.value });
+                  }}
                 />
                 <p className="hint">Whole numbers between 40 and 600.</p>
                 <button className="primary full" disabled={busy}>

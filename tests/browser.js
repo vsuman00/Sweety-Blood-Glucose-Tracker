@@ -38,6 +38,34 @@ try {
   await page
     .getByRole("heading", { name: "A fresh page for this day" })
     .waitFor();
+  const valueInput = page.getByLabel("Glucose (mg/dl)", { exact: true });
+  await page.getByRole("button", { name: "Add reading", exact: true }).click();
+  assert.equal(
+    await valueInput.evaluate((input) => input.validationMessage),
+    "Please enter a glucose value.",
+  );
+  for (const value of ["39", "601", "100.5"]) {
+    await valueInput.fill(value);
+    await page
+      .getByRole("button", { name: "Add reading", exact: true })
+      .click();
+    assert.equal(
+      await valueInput.evaluate((input) => input.validationMessage),
+      "Value must be a whole number between 40 and 600 mg/dl.",
+    );
+  }
+  const dateInput = page.getByLabel("Date", { exact: true });
+  const today = await dateInput.inputValue();
+  const tomorrow = new Date(`${today}T00:00:00Z`);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  await valueInput.fill("100");
+  await dateInput.fill(tomorrow.toISOString().slice(0, 10));
+  await page.getByRole("button", { name: "Add reading", exact: true }).click();
+  assert.equal(
+    await dateInput.evaluate((input) => input.validationMessage),
+    "Date cannot be in the future.",
+  );
+  await dateInput.fill(today);
   await page.getByLabel("Glucose (mg/dl)", { exact: true }).fill("100");
   await page.getByRole("button", { name: "Add reading", exact: true }).click();
   await page.getByText("Reading added.", { exact: true }).waitFor();
@@ -52,7 +80,9 @@ try {
   await page.getByRole("button", { name: "Add reading", exact: true }).click();
   await page
     .getByRole("alert")
-    .filter({ hasText: "already have a reading" })
+    .filter({
+      hasText: "You already have a Morning (fasting) reading for this date.",
+    })
     .waitFor();
   await page
     .getByRole("button", { name: "Edit Morning (fasting)", exact: true })
@@ -60,6 +90,55 @@ try {
   await page.getByLabel("Glucose (mg/dl)", { exact: true }).fill("123");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await page.getByText("Reading updated.", { exact: true }).waitFor();
+  for (const [slot, value] of [
+    ["after_breakfast", "110"],
+    ["after_lunch", "120"],
+    ["after_dinner", "130"],
+  ]) {
+    await page.getByRole("combobox").selectOption(slot);
+    await valueInput.fill(value);
+    await page
+      .getByRole("button", { name: "Add reading", exact: true })
+      .click();
+    await page
+      .getByRole("button", {
+        name: `Edit ${slot === "after_breakfast" ? "After breakfast" : slot === "after_lunch" ? "After lunch" : "After dinner"}`,
+        exact: true,
+      })
+      .waitFor();
+  }
+  await valueInput.fill("140");
+  await page.getByRole("button", { name: "Add reading", exact: true }).click();
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "You can add only 4 readings per day." })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Edit Morning (fasting)", exact: true })
+    .click();
+  await page.getByRole("combobox").selectOption("after_lunch");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await page
+    .getByRole("alert")
+    .filter({
+      hasText: "You already have an After lunch reading for this date.",
+    })
+    .waitFor();
+  await page.getByRole("combobox").selectOption("morning_fasting");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await page.getByText("Reading updated.", { exact: true }).waitFor();
+  for (const label of ["After breakfast", "After lunch", "After dinner"]) {
+    await page
+      .getByRole("button", { name: `Delete ${label}`, exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Delete reading", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: `Delete ${label}`, exact: true })
+      .waitFor({ state: "detached" });
+  }
+
   await page
     .getByRole("button", { name: "Delete Morning (fasting)", exact: true })
     .click();

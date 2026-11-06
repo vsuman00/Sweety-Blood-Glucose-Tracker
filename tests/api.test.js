@@ -338,3 +338,93 @@ test("oversized versions are rejected before reaching PostgreSQL", async () => {
     .expect(200);
   assert.equal(unchanged.readings[0].version, 1);
 });
+
+test("validation errors identify the failed reading rule on creates and edits", async () => {
+  const date = "2026-02-22";
+  const { body } = await mutate(
+    alice,
+    "post",
+    "/api/readings",
+    reading(date),
+  ).expect(201);
+  const editPath = `/api/readings/${body.reading.id}`;
+  for (const [patch, field, message] of [
+    [{ value: null }, "value", "Please enter a glucose value."],
+    [{ value: "" }, "value", "Please enter a glucose value."],
+    [
+      { value: 100.5 },
+      "value",
+      "Value must be a whole number between 40 and 600 mg/dl.",
+    ],
+    [
+      { value: 601 },
+      "value",
+      "Value must be a whole number between 40 and 600 mg/dl.",
+    ],
+    [{ date: "2026-03-02" }, "date", "Date cannot be in the future."],
+  ]) {
+    for (const [method, path] of [
+      ["post", "/api/readings"],
+      ["put", editPath],
+    ]) {
+      const result = await mutate(alice, method, path, {
+        ...reading(date),
+        version: 1,
+        ...patch,
+      }).expect(400);
+      assert.equal(result.body.error.fields[field], message);
+    }
+  }
+  const missing = await mutate(alice, "post", "/api/readings", {
+    date,
+    slot: "after_lunch",
+  }).expect(400);
+  assert.equal(
+    missing.body.error.fields.value,
+    "Please enter a glucose value.",
+  );
+  const duplicate = await mutate(
+    alice,
+    "post",
+    "/api/readings",
+    reading(date),
+  ).expect(409);
+  assert.equal(
+    duplicate.body.error.message,
+    "You already have a Morning (fasting) reading for this date.",
+  );
+  for (const slot of ["after_breakfast", "after_lunch", "after_dinner"])
+    await mutate(alice, "post", "/api/readings", reading(date, slot)).expect(
+      201,
+    );
+  const full = await mutate(
+    alice,
+    "post",
+    "/api/readings",
+    reading(date, "after_lunch"),
+  ).expect(409);
+  assert.equal(full.body.error.code, "DAILY_LIMIT");
+  assert.equal(full.body.error.message, "You can add only 4 readings per day.");
+  const conflict = await mutate(alice, "put", editPath, {
+    ...reading(date, "after_lunch"),
+    version: 1,
+  }).expect(409);
+  assert.equal(conflict.body.error.code, "DUPLICATE_SLOT");
+  assert.equal(
+    conflict.body.error.message,
+    "You already have an After lunch reading for this date.",
+  );
+  const saved = (await alice.get(`/api/readings?date=${date}`)).body.readings;
+  assert.equal(saved.length, 4);
+  assert.equal(saved[0].version, 1);
+  const moved = await mutate(alice, "put", editPath, {
+    ...reading("2026-02-23"),
+    version: 1,
+  }).expect(200);
+  await mutate(alice, "post", "/api/readings", reading(date)).expect(201);
+  const occupied = await mutate(alice, "put", editPath, {
+    ...reading(date),
+    version: moved.body.reading.version,
+  }).expect(409);
+  assert.equal(occupied.body.error.code, "DUPLICATE_SLOT");
+});

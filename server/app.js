@@ -180,7 +180,11 @@ export function createApp({
     });
   });
   function checkDate(date) {
-    if (!validDate(date) || date > today(now()))
+    if (validDate(date) && date > today(now()))
+      throw fail(400, "VALIDATION", "Date cannot be in the future.", {
+        date: "Date cannot be in the future.",
+      });
+    if (!validDate(date))
       throw fail(
         400,
         "VALIDATION",
@@ -194,8 +198,14 @@ export function createApp({
     const fields = {};
     if (!slots.includes(body.slot))
       fields.slot = "Choose one of the four meal slots.";
-    if (!Number.isInteger(body.value) || body.value < 40 || body.value > 600)
-      fields.value = "Enter a whole number from 40 to 600 mg/dl.";
+    if (body.value === undefined || body.value === null || body.value === "")
+      fields.value = "Please enter a glucose value.";
+    else if (
+      !Number.isInteger(body.value) ||
+      body.value < 40 ||
+      body.value > 600
+    )
+      fields.value = "Value must be a whole number between 40 and 600 mg/dl.";
     if (Object.keys(fields).length)
       throw fail(
         400,
@@ -302,20 +312,46 @@ export function createApp({
   app.get("/{*path}", (req, res) =>
     res.sendFile(new URL("../dist/index.html", import.meta.url).pathname),
   );
-  app.use((error, req, res, next) => {
-    if (error.code === "23505")
-      error =
-        error.constraint === "users_email_key"
-          ? fail(
-              409,
-              "EMAIL_EXISTS",
-              "An account with this email already exists.",
-            )
-          : fail(
-              409,
-              "DUPLICATE_SLOT",
-              "You already have a reading for this date and slot. Choose another slot or edit that reading.",
-            );
+  app.use(async (error, req, res, next) => {
+    if (error.code === "23505" && error.constraint === "users_email_key")
+      error = fail(
+        409,
+        "EMAIL_EXISTS",
+        "An account with this email already exists.",
+      );
+    else if (
+      error.code === "23505" &&
+      error.constraint === "readings_user_date_slot_key"
+    ) {
+      try {
+        // The unique constraint resolves races first. This lookup only chooses
+        // the explanatory message after the write has already been rejected.
+        const { rows } =
+          req.method === "POST"
+            ? await pool.query(
+                "SELECT COUNT(*)::integer AS count FROM readings WHERE user_id=$1 AND reading_date=$2",
+                [req.session.userId, req.body.date],
+              )
+            : { rows: [{ count: 0 }] };
+        const labels = {
+          morning_fasting: "Morning (fasting)",
+          after_breakfast: "After breakfast",
+          after_lunch: "After lunch",
+          after_dinner: "After dinner",
+        };
+        const label = labels[req.body.slot];
+        error =
+          rows[0].count >= 4
+            ? fail(409, "DAILY_LIMIT", "You can add only 4 readings per day.")
+            : fail(
+                409,
+                "DUPLICATE_SLOT",
+                `You already have ${label.startsWith("After") ? "an" : "a"} ${label} reading for this date.`,
+              );
+      } catch (lookupError) {
+        error = lookupError;
+      }
+    }
     if (error.type === "entity.parse.failed")
       error = fail(400, "INVALID_JSON", "Send a valid JSON object.");
     if (error.type === "entity.too.large")
