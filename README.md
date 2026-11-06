@@ -105,6 +105,18 @@ Reading responses contain `id`, `date`, `slot`, `value` and `version`. API value
 
 Errors use `{error:{code,message,fields?}}`: 400 for validation, 401 for authentication, 403 for rejected Origin, 404 for unavailable records, 409 for conflicts and 429 for excessive authentication attempts.
 
+Reading validation uses rule-specific messages in the API and form:
+
+| Rule                             | Feedback                                                                                     |
+| -------------------------------- | -------------------------------------------------------------------------------------------- |
+| Missing value                    | Please enter a glucose value.                                                                |
+| Fraction or value outside 40–600 | Value must be a whole number between 40 and 600 mg/dl.                                       |
+| Duplicate slot                   | Names the occupied slot, for example: You already have an After lunch reading for this date. |
+| Creating a reading on a full day | You can add only 4 readings per day.                                                         |
+| Future date                      | Date cannot be in the future.                                                                |
+
+The database rejects conflicting writes before the API selects a duplicate-slot or full-day message. Editing an existing reading on a full day remains allowed; moving it into an occupied slot returns the slot-specific error. Failed validation and conflicts preserve the existing data. Browser checks cover these messages, successful correction after an error, and full-day edits.
+
 A database unique constraint on `(user_id, reading_date, slot)` resolves concurrent duplicates. Four allowed slots plus uniqueness enforce the maximum of four per day. Version-conditional updates and deletes prevent stale tabs from overwriting newer data. Duplicate edits leave the original row unchanged; stale edits prompt a reload. All three report summaries are computed in one SQL statement for a consistent snapshot.
 
 ## Assumptions and improvements
