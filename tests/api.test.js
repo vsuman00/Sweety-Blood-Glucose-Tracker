@@ -322,3 +322,24 @@ test("malformed request bodies return clear errors and login ignores unrelated f
     name: 123,
   }).expect(200);
 });
+
+test("oversized versions are rejected before reaching PostgreSQL", async () => {
+  const { body } = await mutate(
+    alice,
+    "post",
+    "/api/readings",
+    reading("2026-02-21"),
+  ).expect(201);
+  const path = `/api/readings/${body.reading.id}`;
+  for (const version of [2147483648, Number.MAX_SAFE_INTEGER + 1]) {
+    await mutate(alice, "put", path, {
+      ...reading("2026-02-21"),
+      version,
+    }).expect(400);
+    await mutate(alice, "delete", path, { version }).expect(400);
+  }
+  const { body: unchanged } = await alice
+    .get("/api/readings?date=2026-02-21")
+    .expect(200);
+  assert.equal(unchanged.readings[0].version, 1);
+});

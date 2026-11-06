@@ -211,7 +211,11 @@ export function createApp({
       Number(req.params.id) > 2147483647
     )
       throw fail(404, "NOT_FOUND", "Reading not found.");
-    if (!Number.isInteger(req.body.version) || req.body.version < 1)
+    if (
+      !Number.isSafeInteger(req.body.version) ||
+      req.body.version < 1 ||
+      req.body.version > 2147483647
+    )
       throw fail(400, "VALIDATION", "A valid reading version is required.");
   }
   async function missingOrStale(req) {
