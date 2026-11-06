@@ -1,4 +1,4 @@
-# Sweety
+# Sweety – Blood Glucose Tracker
 
 A private glucose journal built for the Kenpath take-home assignment with React, Node.js/Express and PostgreSQL. Users can register, log in, manage readings and review daily and calendar-month summaries.
 
@@ -47,7 +47,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173**. The API runs on port 3001. Use this exact browser origin; state-changing API requests require an Origin header matching `APP_ORIGIN`. Vite proxies `/api` to Express and fails clearly if port 5173 is occupied, keeping the browser origin consistent. Stop the app with Ctrl+C.
+Open **http://127.0.0.1:5173**. The API runs on port 3001. Use this exact browser origin; state-changing API requests require an Origin header matching `APP_ORIGIN`. Vite proxies `/api` to Express and fails clearly if port 5173 is occupied, keeping the browser origin consistent. Stop the app with Ctrl+C. You can also run the API and client in separate terminals with `npm run dev:api` and `npm run dev:client`.
 
 Synthetic demo accounts:
 
@@ -119,7 +119,7 @@ The database rejects conflicting writes before the API selects a duplicate-slot 
 
 A database unique constraint on `(user_id, reading_date, slot)` resolves concurrent duplicates. Four allowed slots plus uniqueness enforce the maximum of four per day. Version-conditional updates and deletes prevent stale tabs from overwriting newer data. Duplicate edits leave the original row unchanged; stale edits prompt a reload. All three report summaries are computed in one SQL statement for a consistent snapshot.
 
-## Assumptions and improvements
+## Notes
 
 Employer requirements are registration/login, private CRUD, four slots, integer glucose from 40 to 600 mg/dl, no future dates, duplicate prevention, daily/month reports, clear errors and submission materials. PostgreSQL takes precedence over the email's ambiguous "MERN + PostgreSQL" wording.
 
