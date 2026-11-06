@@ -1,14 +1,9 @@
+import { testDatabaseUrl } from "./helpers/test-database.js";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { makePool, migrate } from "../server/database.js";
 import { createApp } from "../server/app.js";
-const url = process.env.TEST_DATABASE_URL;
-if (
-  !url ||
-  !new URL(url).pathname.endsWith("_test") ||
-  url === process.env.DATABASE_URL
-)
-  throw new Error("Use a separate test database ending in _test.");
+const url = testDatabaseUrl();
 const pool = makePool(url);
 await migrate(pool);
 const origin = "http://127.0.0.1:3002";
