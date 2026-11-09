@@ -80,7 +80,7 @@ Set these variables in Vercel's Production environment:
 | ---------------- | ---------------------------------------------------------- |
 | `DATABASE_URL`   | Neon's pooled connection URL, including its SSL parameters |
 | `SESSION_SECRET` | A private random value of at least 32 characters           |
-| `APP_ORIGIN`     | `https://sweety-blood-glucose-tracker.vercel.app`          |
+| `APP_ORIGIN`     | `https://sweety-blood-glucose-tracker-tan.vercel.app`      |
 | `NODE_ENV`       | `production`                                               |
 
 Keep database credentials and the session secret on the server; never prefix them with `VITE_`. Set `APP_ORIGIN` to the exact browser origin, without a trailing slash. Changing the domain requires updating this value and redeploying. Production cookies require HTTPS; Express trusts one reverse proxy.
