@@ -72,7 +72,7 @@ Open http://127.0.0.1:3001. Express serves the built client. Restore `APP_ORIGIN
 
 The Neon project is named **Sweety-Blood Glucose Tracker**. Vercel requires a lowercase name without spaces, so its project is **sweety-blood-glucose-tracker**. The API and database use Singapore regions.
 
-Vercel builds the React client with `npm run build` and serves `dist/`. The `api/[...path].js` entry point exposes the existing Express API under `/api`, with a shared PostgreSQL pool attached to Vercel's function lifecycle. Local development still uses `server/index.js`.
+Vercel builds the React client with `npm run build` and serves `dist/`. Its install command includes development dependencies so Vite is available when `NODE_ENV=production`. The `vercel.json` rewrite routes all `/api` paths to `api/index.js`, which exposes the existing Express API with a shared PostgreSQL pool attached to Vercel's function lifecycle. Local development still uses `server/index.js`.
 
 Set these variables in Vercel's Production environment:
 
@@ -96,6 +96,14 @@ node --env-file=.env.production.local scripts/seed.js
 Do not run the test suites against production. Preview deployments need a separate database and an `APP_ORIGIN` matching their browser origin. Production credentials are not configured for previews. For migrations on an existing database, verify the change on a Neon branch before applying it to production.
 
 After deployment, verify registration, login, session persistence after refresh, reading creation/editing/deletion, reports and logout over HTTPS. The in-memory authentication rate limiter applies per function instance, so it does not provide a shared limit across instances. Expired-session cleanup remains an operational follow-up.
+
+Run the deployment smoke check against the seeded demo deployment:
+
+```sh
+npm run test:deployment -- https://sweety-blood-glucose-tracker-tan.vercel.app
+```
+
+This check reads the synthetic demo account's data and tests login, secure cookies, nested API routing, Origin rejection and logout. It does not change readings.
 
 ## Verification
 

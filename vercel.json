@@ -4,5 +4,6 @@
   "installCommand": "npm ci --include=dev",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "regions": ["sin1"]
+  "regions": ["sin1"],
+  "rewrites": [{ "source": "/api/:path*", "destination": "/api/index" }]
 }

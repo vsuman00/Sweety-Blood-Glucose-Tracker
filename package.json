@@ -15,7 +15,8 @@
     "test:browser": "node --env-file=.env tests/browser.js && npm run test:session",
     "format": "prettier --write api client server scripts tests vite.config.js vercel.json package.json index.html README.md",
     "format:check": "prettier --check api client server scripts tests vite.config.js vercel.json package.json index.html README.md",
-    "test:session": "node tests/session-browser.js"
+    "test:session": "node tests/session-browser.js",
+    "test:deployment": "node tests/deployment-smoke.js"
   },
   "engines": {
     "node": ">=22.12"
