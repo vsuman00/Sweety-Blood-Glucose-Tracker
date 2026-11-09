@@ -6,7 +6,7 @@ A private glucose journal built for the Kenpath take-home assignment with React,
 
 ## Assignment coverage
 
-The required application features and local delivery materials are implemented. The following checklist describes the local project; publishing the commits to GitHub and submitting the assignment remain separate approval steps.
+The required application features and local delivery materials are implemented. The following checklist describes the application; employer submission remains a separate step.
 
 | Requirement                           | Local implementation                                                                                                                                               |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -66,7 +66,36 @@ npm run build
 npm start
 ```
 
-Open http://127.0.0.1:3001. Express serves the built client. Restore `APP_ORIGIN` to port 5173 before using the Vite development server again. Actual hosting requires HTTPS, `NODE_ENV=production`, a matching `APP_ORIGIN`, and a configured trusted reverse proxy. Deployment is outside the submitted local implementation.
+Open http://127.0.0.1:3001. Express serves the built client. Restore `APP_ORIGIN` to port 5173 before using the Vite development server again.
+
+## Deploy to Vercel and Neon
+
+The Neon project is named **Sweety-Blood Glucose Tracker**. Vercel requires a lowercase name without spaces, so its project is **sweety-blood-glucose-tracker**. The API and database use Singapore regions.
+
+Vercel builds the React client with `npm run build` and serves `dist/`. The `api/[...path].js` entry point exposes the existing Express API under `/api`, with a shared PostgreSQL pool attached to Vercel's function lifecycle. Local development still uses `server/index.js`.
+
+Set these variables in Vercel's Production environment:
+
+| Variable         | Value                                                      |
+| ---------------- | ---------------------------------------------------------- |
+| `DATABASE_URL`   | Neon's pooled connection URL, including its SSL parameters |
+| `SESSION_SECRET` | A private random value of at least 32 characters           |
+| `APP_ORIGIN`     | `https://sweety-blood-glucose-tracker.vercel.app`          |
+| `NODE_ENV`       | `production`                                               |
+
+Keep database credentials and the session secret on the server; never prefix them with `VITE_`. Set `APP_ORIGIN` to the exact browser origin, without a trailing slash. Changing the domain requires updating this value and redeploying. Production cookies require HTTPS; Express trusts one reverse proxy.
+
+Run schema migrations manually with Neon's **direct** connection URL in an ignored `.env.production.local` file:
+
+```sh
+node --env-file=.env.production.local scripts/migrate.js
+# Optional synthetic demo accounts and readings:
+node --env-file=.env.production.local scripts/seed.js
+```
+
+Do not run the test suites against production. Preview deployments need a separate database and an `APP_ORIGIN` matching their browser origin. Production credentials are not configured for previews. For migrations on an existing database, verify the change on a Neon branch before applying it to production.
+
+After deployment, verify registration, login, session persistence after refresh, reading creation/editing/deletion, reports and logout over HTTPS. The in-memory authentication rate limiter applies per function instance, so it does not provide a shared limit across instances. Expired-session cleanup remains an operational follow-up.
 
 ## Verification
 
@@ -142,4 +171,4 @@ Possible improvements: password reset and email verification, per-user timezone 
 - Setup, test instructions, assumptions and improvements: this README
 - Configuration placeholders: `.env.example`; synthetic seed: `scripts/seed.js`
 
-Local commits record implementation checkpoints and fixes. Repository publication and employer submission require separate approval. Neither is performed by the application.
+Commits record implementation checkpoints, fixes and deployment configuration. Employer submission is a separate step and is not performed by the application.
