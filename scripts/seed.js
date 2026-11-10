@@ -35,6 +35,15 @@ try {
         );
     }
   }
+  await client.query(
+    "INSERT INTO users(name,email,password_hash,role) VALUES('Dr. Taylor','doctor@example.test',$1,'doctor') ON CONFLICT(email) DO NOTHING",
+    [password],
+  );
+  await client.query(`INSERT INTO doctor_patients(doctor_id,patient_id)
+    SELECT d.id,p.id FROM users d,users p
+    WHERE d.email='doctor@example.test' AND d.role='doctor'
+    AND p.email='demo@example.test' AND p.role='patient'
+    ON CONFLICT DO NOTHING`);
   await client.query("COMMIT");
   console.log(
     "Synthetic seed complete. Demo login: demo@example.test / Sweety-demo-2026",

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-const slots = {
-  morning_fasting: "Morning (fasting)",
-  after_breakfast: "After breakfast",
-  after_lunch: "After lunch",
-  after_dinner: "After dinner",
-};
+import { slots } from "./constants.js";
+import { ReadingForm } from "./components/ReadingForm.jsx";
+import { ReadingHistory } from "./components/ReadingHistory.jsx";
+import { ReportPanels } from "./components/ReportPanels.jsx";
+import { DoctorDashboard } from "./components/DoctorDashboard.jsx";
+import { MonthlyChart } from "./components/MonthlyChart.jsx";
 const localToday = () =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -82,7 +82,7 @@ function App() {
       .finally(() => setReady(true));
   }, []);
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.role === "doctor") return;
     let active = true;
     setLoading(true);
     setReports(null);
@@ -137,17 +137,11 @@ function App() {
       setBusy(false);
     }
   }
-  async function save(event) {
-    event.preventDefault();
+  async function save(payload) {
     setBusy(true);
     setFormError(null);
     setNotice("");
     try {
-      const payload = {
-        ...form,
-        value: form.value.trim() === "" ? null : Number(form.value),
-        ...(editing && { version: editing.version }),
-      };
       await api(
         editing ? `/readings/${editing.id}` : "/readings",
         send(editing ? "PUT" : "POST", payload),
@@ -313,6 +307,19 @@ function App() {
             </button>
           </section>
         </main>
+      ) : user.role === "doctor" ? (
+        <main className="shell">
+          <h1>Hello, {user.name}.</h1>
+          <p className="muted">Assigned patient reports · Read-only access</p>
+          <DoctorDashboard
+            key={user.id}
+            api={api}
+            date={date}
+            maxDate={maxDate}
+            onDateChange={setDate}
+            onSessionExpired={sessionExpired}
+          />
+        </main>
       ) : (
         <main className="shell">
           <div className="page-heading">
@@ -372,172 +379,43 @@ function App() {
                   Reload latest data
                 </button>
               )}
-              <form onSubmit={save}>
-                <label>
-                  Date
-                  <input
-                    required
-                    type="date"
-                    min="1900-01-01"
-                    max={maxDate}
-                    value={form.date}
-                    onInvalid={(event) => {
-                      const input = event.currentTarget;
-                      input.setCustomValidity(
-                        input.validity.rangeOverflow
-                          ? "Date cannot be in the future."
-                          : "Choose a valid date from 1900 through today.",
-                      );
-                    }}
-                    onChange={(e) => {
-                      e.currentTarget.setCustomValidity("");
-                      setForm({ ...form, date: e.target.value });
-                    }}
-                  />
-                </label>
-                <label>
-                  Meal slot
-                  <select
-                    value={form.slot}
-                    onChange={(e) => setForm({ ...form, slot: e.target.value })}
-                  >
-                    {Object.entries(slots).map(([code, label]) => (
-                      <option key={code} value={code}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label htmlFor="reading-value">
-                  Glucose <span className="muted">(mg/dl)</span>
-                </label>
-                <input
-                  id="reading-value"
-                  required
-                  type="number"
-                  min="40"
-                  max="600"
-                  step="1"
-                  inputMode="numeric"
-                  placeholder="e.g. 105"
-                  value={form.value}
-                  onInvalid={(event) => {
-                    const input = event.currentTarget;
-                    input.setCustomValidity(
-                      input.validity.valueMissing && !input.validity.badInput
-                        ? "Please enter a glucose value."
-                        : "Value must be a whole number between 40 and 600 mg/dl.",
-                    );
-                  }}
-                  onChange={(e) => {
-                    e.currentTarget.setCustomValidity("");
-                    setForm({ ...form, value: e.target.value });
-                  }}
-                />
-                <p className="hint">Whole numbers between 40 and 600.</p>
-                <button className="primary full" disabled={busy}>
-                  {busy
-                    ? "Saving..."
-                    : editing
-                      ? "Save changes"
-                      : "Add reading"}
-                </button>
-                {editing && (
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={busy}
-                    onClick={resetForm}
-                  >
-                    Cancel edit
-                  </button>
-                )}
-              </form>
+              <ReadingForm
+                form={form}
+                onChange={setForm}
+                maxDate={maxDate}
+                editing={editing}
+                busy={busy}
+                onSave={save}
+                onCancel={resetForm}
+              />
               <div className="privacy-note">
                 Your readings are private to your account.
               </div>
             </section>
             <div className="report-area" aria-busy={loading}>
               {loading && <p role="status">Loading your readings...</p>}
-              {reports && (
-                <>
-                  <section className="panel daily-panel">
-                    <div className="section-heading">
-                      <div>
-                        <p className="eyebrow">THE DAILY PICTURE</p>
-                        <h2>Daily report</h2>
-                      </div>
-                      <span className="pill">
-                        {reports.daily.count} of 4 readings
-                      </span>
-                    </div>
-                    <Stats report={reports.daily} />
-                    {!reports.daily.count ? (
-                      <div className="empty">
-                        <span aria-hidden="true">○</span>
-                        <h3>A fresh page for this day</h3>
-                        <p>Add your first reading to see your daily picture.</p>
-                      </div>
-                    ) : (
-                      <ul className="reading-list">
-                        {reports.daily.readings.map((reading) => (
-                          <li key={reading.id}>
-                            <div>
-                              <span className="slot-name">
-                                {slots[reading.slot]}
-                              </span>
-                              <span className="reading-number">
-                                {reading.value} <small>mg/dl</small>
-                              </span>
-                            </div>
-                            <div className="row-actions">
-                              <button
-                                disabled={busy}
-                                onClick={() => edit(reading)}
-                                aria-label={`Edit ${slots[reading.slot]}`}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                disabled={busy}
-                                className="danger"
-                                onClick={() => setDeleting(reading)}
-                                aria-label={`Delete ${slots[reading.slot]}`}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </section>
-                  <div className="summary-grid">
-                    {[
-                      ["monthToDate", "Month to date"],
-                      ["previousMonth", "Previous month"],
-                    ].map(([key, title]) => (
-                      <section className="panel summary" key={key}>
-                        <p className="eyebrow">{title.toUpperCase()}</p>
-                        <h2>
-                          {reports[key].start} <span className="muted">to</span>{" "}
-                          {key === "monthToDate"
-                            ? date
-                            : previousDay(reports[key].end)}
-                        </h2>
-                        <Stats report={reports[key]} />
-                        {!reports[key].count && (
-                          <p className="hint">
-                            No readings in this period yet.
-                          </p>
-                        )}
-                      </section>
-                    ))}
-                  </div>
-                </>
-              )}
+              <ReportPanels
+                reports={reports}
+                date={date}
+                busy={busy}
+                onEdit={edit}
+                onDelete={setDeleting}
+              />
             </div>
           </div>
+          <MonthlyChart
+            key={`chart-${user.id}`}
+            api={api}
+            month={date.slice(0, 7)}
+            refresh={refresh}
+            onSessionExpired={sessionExpired}
+          />
+          <ReadingHistory
+            key={user.id}
+            api={api}
+            refresh={refresh}
+            onSessionExpired={sessionExpired}
+          />
           <footer>
             Made for everyday tracking. All glucose values are in mg/dl.
           </footer>
@@ -617,11 +495,6 @@ function DeleteDialog({ children, close, busy }) {
     </div>
   );
 }
-function previousDay(date) {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
 function ErrorBox({ error }) {
   return error ? (
     <div className="error" role="alert">
@@ -635,22 +508,5 @@ function ErrorBox({ error }) {
       )}
     </div>
   ) : null;
-}
-function Stats({ report }) {
-  return (
-    <dl className="stats">
-      {[
-        ["Highest", report.highest],
-        ["Lowest", report.lowest],
-        ["Average", report.average === null ? null : report.average.toFixed(1)],
-        ["Count", report.count],
-      ].map(([label, value]) => (
-        <div key={label}>
-          <dt>{label}</dt>
-          <dd>{value ?? "—"}</dd>
-        </div>
-      ))}
-    </dl>
-  );
 }
 createRoot(document.getElementById("root")).render(<App />);

@@ -12,32 +12,50 @@
     "db:migrate": "node --env-file=.env scripts/migrate.js",
     "db:seed": "node --env-file=.env scripts/seed.js",
     "test": "node --env-file=.env --test --test-concurrency=1 tests/*.test.js",
-    "test:browser": "node --env-file=.env tests/browser.js && npm run test:session",
-    "format": "prettier --write api client server scripts tests vite.config.js vercel.json package.json index.html README.md",
-    "format:check": "prettier --check api client server scripts tests vite.config.js vercel.json package.json index.html README.md",
+    "test:browser": "node --env-file=.env tests/browser.js && npm run test:session && node --env-file=.env tests/doctor-browser.js",
+    "format": "prettier --write api client lib server scripts tests vite.config.js vitest.config.js vercel.json package.json index.html README.md docs/optional-features",
+    "format:check": "prettier --check api client lib server scripts tests vite.config.js vitest.config.js vercel.json package.json index.html README.md docs/optional-features",
     "test:session": "node tests/session-browser.js",
-    "test:deployment": "node tests/deployment-smoke.js"
+    "test:deployment": "node tests/deployment-smoke.js",
+    "test:isolated": "node scripts/test-isolated.js",
+    "test:ui": "vitest run",
+    "test:cache:live": "node --env-file=.env tests/cache-live.js",
+    "access": "node --env-file=.env scripts/manage-access.js",
+    "test:jobs:integration": "node scripts/test-jobs.js",
+    "worker": "node --env-file=.env server/worker.js",
+    "reminders:enqueue": "node --env-file=.env scripts/enqueue-reminders.js",
+    "test:deployed:browser": "node tests/deployed-browser.js",
+    "test:deployed:cache": "node tests/deployed-cache.js"
   },
   "engines": {
-    "node": ">=22.12"
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "dependencies": {
+    "@upstash/redis": "^1.41.0",
     "@vercel/functions": "^3.11.1",
     "bcrypt": "^6.0.0",
+    "bullmq": "^6.7.3",
     "connect-pg-simple": "^10.0.0",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.3",
     "express-session": "^1.19.0",
+    "ioredis": "^6.0.0",
     "pg": "^8.23.1",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@vitejs/plugin-react": "^6.2.1",
     "concurrently": "^10.0.6",
+    "jsdom": "^31.0.0",
     "playwright": "^1.65.0",
     "prettier": "^3.9.10",
     "supertest": "^7.3.1",
-    "vite": "^8.3.6"
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
   }
 }

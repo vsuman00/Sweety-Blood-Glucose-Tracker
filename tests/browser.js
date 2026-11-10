@@ -95,7 +95,7 @@ try {
     ["after_lunch", "120"],
     ["after_dinner", "130"],
   ]) {
-    await page.getByRole("combobox").selectOption(slot);
+    await page.getByLabel("Meal slot").selectOption(slot);
     await valueInput.fill(value);
     await page
       .getByRole("button", { name: "Add reading", exact: true })
@@ -116,7 +116,7 @@ try {
   await page
     .getByRole("button", { name: "Edit Morning (fasting)", exact: true })
     .click();
-  await page.getByRole("combobox").selectOption("after_lunch");
+  await page.getByLabel("Meal slot").selectOption("after_lunch");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await page
     .getByRole("alert")
@@ -124,7 +124,7 @@ try {
       hasText: "You already have an After lunch reading for this date.",
     })
     .waitFor();
-  await page.getByRole("combobox").selectOption("morning_fasting");
+  await page.getByLabel("Meal slot").selectOption("morning_fasting");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await page.getByText("Reading updated.", { exact: true }).waitFor();
   for (const label of ["After breakfast", "After lunch", "After dinner"]) {
@@ -155,13 +155,66 @@ try {
   await page
     .getByRole("heading", { name: "A fresh page for this day" })
     .waitFor();
+  await pool.query(
+    `INSERT INTO readings(user_id,reading_date,slot,glucose_value)
+     SELECT u.id,$1::date-days.day,slot,140 FROM users u,
+     generate_series(1,6) days(day),unnest($2::text[]) slot WHERE u.email=$3`,
+    [
+      today,
+      ["morning_fasting", "after_breakfast", "after_lunch", "after_dinner"],
+      email,
+    ],
+  );
+  await page.reload();
+  await page.getByText("Page 1 of 2 · 24 readings", { exact: true }).waitFor();
+  assert.equal(await page.locator(".history-panel tbody tr").count(), 20);
+  await page.getByRole("button", { name: "Next page", exact: true }).click();
+  await page.getByText("Page 2 of 2 · 24 readings", { exact: true }).waitFor();
+  assert.equal(await page.locator(".history-panel tbody tr").count(), 4);
+  await page
+    .getByRole("button", { name: "Previous page", exact: true })
+    .click();
+  await page.getByText("Page 1 of 2 · 24 readings", { exact: true }).waitFor();
+  await page.locator(".chart-container svg.recharts-surface").first().waitFor();
+  await page.screenshot({
+    path: "docs/screenshots/optional-dashboard.png",
+    fullPage: true,
+  });
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForFunction(() => {
+    const box = document.querySelector(".chart-container"),
+      chart = box?.querySelector(".recharts-wrapper");
+    return (
+      !chart ||
+      chart.getBoundingClientRect().width <=
+        box.getBoundingClientRect().width + 1
+    );
+  });
+  const overflow = await page.evaluate(() =>
+    [...document.querySelectorAll("body *")]
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.right > window.innerWidth + 1;
+      })
+      .slice(0, 12)
+      .map((element) => ({
+        tag: element.tagName,
+        class: element.getAttribute("class"),
+        right: element.getBoundingClientRect().right,
+        text: element.textContent.slice(0, 60),
+      })),
+  );
   assert.equal(
     await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth,
     ),
     false,
+    JSON.stringify(overflow),
   );
+  await page.screenshot({
+    path: "docs/screenshots/mobile.png",
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await page.getByRole("heading", { name: "Welcome back" }).waitFor();
   await page.reload();

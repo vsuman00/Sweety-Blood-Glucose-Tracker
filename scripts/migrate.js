@@ -1,5 +1,7 @@
 import { makePool, migrate } from "../server/database.js";
-const pool = makePool(process.env.DATABASE_URL);
+const pool = makePool(
+  process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL,
+);
 try {
   await migrate(pool);
   console.log("Migrations complete.");

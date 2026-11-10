@@ -4,15 +4,23 @@ import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import { rateLimit } from "express-rate-limit";
 import { today, validDate, ranges, slots } from "./dates.js";
+import { pagination, pageInfo } from "./pagination.js";
+import {
+  loadReports,
+  loadMonthly,
+  readingFields,
+  createReportReader,
+} from "./reports.js";
+import { transaction } from "./database.js";
+import { addDoctorRoutes } from "./doctor.js";
 const fail = (status, code, message, fields) =>
   Object.assign(new Error(message), { status, code, fields });
 const publicUser = (user) => ({
   id: user.id,
   name: user.name,
   email: user.email,
+  role: user.role,
 });
-const readingFields =
-  "id, reading_date AS date, slot, glucose_value AS value, version";
 export function createApp({
   pool,
   secret,
@@ -20,10 +28,14 @@ export function createApp({
   production = false,
   now = () => new Date(),
   authLimit = 30,
+  cache = null,
+  onCacheEvent = (result) =>
+    console.info(JSON.stringify({ event: "report_cache", result })),
 }) {
   if (!secret || secret.length < 32)
     throw new Error("SESSION_SECRET must contain at least 32 characters.");
   const app = express();
+  const readReport = createReportReader(pool, cache, onCacheEvent);
   app.disable("x-powered-by");
   if (production) app.set("trust proxy", 1);
   app.use((req, res, next) => {
@@ -125,7 +137,7 @@ export function createApp({
     const data = validateAccount(req.body, true);
     const hash = await bcrypt.hash(data.password, 12);
     const { rows } = await pool.query(
-      "INSERT INTO users(name,email,password_hash) VALUES($1,$2,$3) RETURNING id,name,email",
+      "INSERT INTO users(name,email,password_hash) VALUES($1,$2,$3) RETURNING id,name,email,role",
       [data.name, data.email, hash],
     );
     res.status(201).json({ user: publicUser(rows[0]) });
@@ -162,23 +174,30 @@ export function createApp({
       res.status(204).end();
     }),
   );
-  app.use("/api", (req, res, next) =>
-    req.session.userId
-      ? next()
-      : next(fail(401, "AUTH_REQUIRED", "Please log in to continue.")),
-  );
-  app.get("/api/auth/me", async (req, res) => {
+  app.use("/api", async (req, res, next) => {
+    if (!req.session.userId)
+      throw fail(401, "AUTH_REQUIRED", "Please log in to continue.");
     const { rows } = await pool.query(
-      "SELECT id,name,email FROM users WHERE id=$1",
+      "SELECT id,name,email,role FROM users WHERE id=$1",
       [req.session.userId],
     );
     if (!rows.length) throw fail(401, "AUTH_REQUIRED", "Please log in again.");
+    req.user = rows[0];
+    next();
+  });
+  app.get("/api/auth/me", (req, res) =>
     res.json({
-      user: publicUser(rows[0]),
+      user: publicUser(req.user),
       today: today(now()),
       timezone: "Asia/Kolkata",
+    }),
+  );
+  for (const path of ["/api/readings", "/api/reports"])
+    app.use(path, (req, res, next) => {
+      if (req.user.role !== "patient")
+        return next(fail(403, "ROLE_REQUIRED", "Patient access is required."));
+      next();
     });
-  });
   function checkDate(date) {
     if (validDate(date) && date > today(now()))
       throw fail(400, "VALIDATION", "Date cannot be in the future.", {
@@ -228,8 +247,8 @@ export function createApp({
     )
       throw fail(400, "VALIDATION", "A valid reading version is required.");
   }
-  async function missingOrStale(req) {
-    const { rowCount } = await pool.query(
+  async function missingOrStale(req, database = pool) {
+    const { rowCount } = await database.query(
       "SELECT id FROM readings WHERE id=$1 AND user_id=$2",
       [req.params.id, req.session.userId],
     );
@@ -240,8 +259,38 @@ export function createApp({
       "This reading changed elsewhere. Reload the latest data before trying again.",
     );
   }
+  async function writeReading(req, query, parameters, existing = false) {
+    return transaction(pool, async (client) => {
+      const result = await client.query(query, parameters);
+      if (existing && !result.rowCount) await missingOrStale(req, client);
+      await client.query(
+        "UPDATE users SET report_revision=report_revision+1 WHERE id=$1",
+        [req.session.userId],
+      );
+      return result;
+    });
+  }
   app.get("/api/readings", async (req, res) => {
-    checkDate(req.query.date);
+    const date =
+      req.query.date === undefined ? null : checkDate(req.query.date);
+    if (
+      date === null ||
+      req.query.page !== undefined ||
+      req.query.limit !== undefined
+    ) {
+      const { page, limit, offset } = pagination(req.query);
+      const { rows } = await pool.query(
+        `WITH filtered AS (SELECT ${readingFields} FROM readings WHERE user_id=$1 AND ($2::date IS NULL OR reading_date=$2::date)),
+        selected AS (SELECT * FROM filtered ORDER BY date DESC,array_position($3::text[],slot),id LIMIT $4 OFFSET $5)
+        SELECT (SELECT COUNT(*)::integer FROM filtered) AS total,
+        COALESCE((SELECT jsonb_agg(selected ORDER BY date DESC,array_position($3::text[],slot),id) FROM selected),'[]'::jsonb) AS readings`,
+        [req.session.userId, date, slots, limit, offset],
+      );
+      return res.json({
+        readings: rows[0].readings,
+        pagination: pageInfo(page, limit, rows[0].total),
+      });
+    }
     const { rows } = await pool.query(
       `SELECT ${readingFields} FROM readings WHERE user_id=$1 AND reading_date=$2 ORDER BY array_position($3::text[],slot)`,
       [req.session.userId, req.query.date, slots],
@@ -251,7 +300,8 @@ export function createApp({
   app.post("/api/readings", async (req, res) => {
     validateReading(req.body);
     const { date, slot, value } = req.body;
-    const { rows } = await pool.query(
+    const { rows } = await writeReading(
+      req,
       `INSERT INTO readings(user_id,reading_date,slot,glucose_value) VALUES($1,$2,$3,$4) RETURNING ${readingFields}`,
       [req.session.userId, date, slot, value],
     );
@@ -261,50 +311,55 @@ export function createApp({
     versionAndId(req);
     validateReading(req.body);
     const { date, slot, value, version } = req.body;
-    const { rows } = await pool.query(
+    const { rows } = await writeReading(
+      req,
       `UPDATE readings SET reading_date=$1,slot=$2,glucose_value=$3,version=version+1,updated_at=now() WHERE id=$4 AND user_id=$5 AND version=$6 RETURNING ${readingFields}`,
       [date, slot, value, req.params.id, req.session.userId, version],
+      true,
     );
-    if (!rows.length) await missingOrStale(req);
     res.json({ reading: rows[0] });
   });
   app.delete("/api/readings/:id", async (req, res) => {
     versionAndId(req);
-    const { rowCount } = await pool.query(
+    await writeReading(
+      req,
       "DELETE FROM readings WHERE id=$1 AND user_id=$2 AND version=$3",
       [req.params.id, req.session.userId, req.body.version],
+      true,
     );
-    if (!rowCount) await missingOrStale(req);
     res.status(204).end();
   });
-  app.get("/api/reports", async (req, res) => {
+  async function summary(req, res, userId) {
     const date = checkDate(req.query.date);
-    // One query gives all three summaries and daily rows from one database snapshot.
-    const periods = ranges(date);
-    const { rows } = await pool.query(
-      `WITH periods AS (SELECT * FROM jsonb_to_recordset($2::jsonb) AS p(name text,start date,"end" date))
-   SELECT p.name,p.start,p."end",MAX(r.glucose_value) AS highest,MIN(r.glucose_value) AS lowest,
-   ROUND(AVG(r.glucose_value),1)::float8 AS average,COUNT(r.id)::integer AS count,
-   COALESCE(jsonb_agg(jsonb_build_object('id',r.id,'date',r.reading_date,'slot',r.slot,'value',r.glucose_value,'version',r.version)
-   ORDER BY array_position($3::text[],r.slot)) FILTER (WHERE r.id IS NOT NULL AND p.name='daily'),'[]') AS readings
-   FROM periods p LEFT JOIN readings r ON r.user_id=$1 AND r.reading_date>=p.start AND r.reading_date<p."end"
-   GROUP BY p.name,p.start,p."end"`,
-      [
-        req.session.userId,
-        JSON.stringify(
-          Object.entries(periods).map(([name, [start, end]]) => ({
-            name,
-            start,
-            end,
-          })),
-        ),
-        slots,
-      ],
-    );
     res.json(
-      Object.fromEntries(rows.map(({ name, ...report }) => [name, report])),
+      await readReport(userId, "summary", date, () =>
+        loadReports(pool, userId, date),
+      ),
     );
-  });
+  }
+  async function monthly(req, res, userId) {
+    const month = req.query.month;
+    if (typeof month !== "string" || !/^\d{4}-\d{2}$/.test(month))
+      throw fail(
+        400,
+        "VALIDATION",
+        "Choose a valid month from 1900 through this month.",
+      );
+    const start = checkDate(`${month}-01`);
+    const [year, monthNumber] = month.split("-").map(Number);
+    const end =
+      month === today(now()).slice(0, 7)
+        ? ranges(today(now())).daily[1]
+        : new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10);
+    res.json(
+      await readReport(userId, "monthly", `${start}:${end}`, () =>
+        loadMonthly(pool, userId, start, end),
+      ),
+    );
+  }
+  app.get("/api/reports", (req, res) => summary(req, res, req.user.id));
+  app.get("/api/reports/monthly", (req, res) => monthly(req, res, req.user.id));
+  addDoctorRoutes(app, { pool, summary, monthly });
   app.use("/api", (req, res, next) =>
     next(fail(404, "NOT_FOUND", "Endpoint not found.")),
   );

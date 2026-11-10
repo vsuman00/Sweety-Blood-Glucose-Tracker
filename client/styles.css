@@ -394,6 +394,56 @@ select:focus {
 .auth-panel h2 {
   font-size: 28px;
 }
+.history-panel {
+  margin-top: 24px;
+  min-width: 0;
+}
+.chart-panel {
+  margin-top: 24px;
+  min-width: 0;
+}
+.doctor-report {
+  margin-top: 28px;
+}
+.doctor-report .summary-grid {
+  margin-top: 24px;
+}
+.chart-container {
+  height: 310px;
+  width: 100%;
+  min-width: 0;
+  margin: 20px 0;
+}
+summary {
+  cursor: pointer;
+  font-size: 14px;
+  margin: 16px 0;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+th,
+td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #e2e7dc;
+  text-align: left;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 footer {
   font-size: 11px;
   text-align: center;

@@ -60,6 +60,13 @@ try {
           monthToDate: report(),
           previousMonth: report(),
         };
+      } else if (path === "/api/reports/monthly") {
+        body = { start: "2026-11-01", end: "2026-11-07", readings: [] };
+      } else if (path === "/api/readings") {
+        body = {
+          readings: [],
+          pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+        };
       } else if (path === "/api/readings/77") {
         status = 401;
         body = {

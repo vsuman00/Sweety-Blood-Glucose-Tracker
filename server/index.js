@@ -1,11 +1,14 @@
 import { makePool } from "./database.js";
 import { createApp } from "./app.js";
+import { createCache } from "./cache.js";
+import { runtimeOrigin } from "./runtime.js";
 const pool = makePool(process.env.DATABASE_URL);
 const app = createApp({
   pool,
   secret: process.env.SESSION_SECRET,
-  origin: process.env.APP_ORIGIN,
+  origin: runtimeOrigin(),
   production: process.env.NODE_ENV === "production",
+  cache: createCache(),
 });
 const server = app.listen(Number(process.env.PORT || 3001), "127.0.0.1", () =>
   console.log(
